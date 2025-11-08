@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+venv/
+venv2/
+ENV/
+.env
+.venv/
+
+# VS Code
+.vscode/
+
+# Byte-compiled / cache
+*.pyc
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Database, logs
+*.sqlite3
+*.db
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Certs and secrets
+cert/
+config/*.key
+config/*.pem
+
+# Node / misc
+node_modules/
+
+# temporary files
+*.swp
+
+README.md
+TASK1_SUMMARY.md
