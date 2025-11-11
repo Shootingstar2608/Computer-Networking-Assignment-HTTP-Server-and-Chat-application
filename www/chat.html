@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>P2P Chat - CO3094 Assignment</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        h2 { color: #555; font-size: 18px; margin-top: 20px; }
+        
+        /* Peer Info Section */
+        .peer-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .peer-info input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .peer-info button {
+            padding: 8px 15px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .peer-info button:hover { background: #0056b3; }
+        
+        /* Peer List Section */
+        .peer-list {
+            background: #fff3e0;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .peer-item {
+            padding: 5px;
+            margin: 3px 0;
+            background: white;
+            border-left: 3px solid #ff9800;
+            padding-left: 10px;
+        }
+        
+        /* Messages Section */
+        .messages {
+            border: 1px solid #ddd;
+            height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #fafafa;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+        .message {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            background: white;
+            border-left: 3px solid #4caf50;
+        }
+        .message.broadcast {
+            border-left-color: #2196f3;
+            background: #e3f2fd;
+        }
+        .message.direct {
+            border-left-color: #ff9800;
+            background: #fff3e0;
+        }
+        .message-header {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 3px;
+        }
+        .message-content {
+            font-size: 14px;
+            color: #333;
+        }
+        
+        /* Input Section */
+        .input-section {
+            margin-top: 15px;
+        }
+        .input-section input[type="text"] {
+            width: 70%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .input-section button {
+            width: 13%;
+            padding: 10px;
+            margin-left: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            color: white;
+        }
+        .btn-broadcast { background: #2196f3; }
+        .btn-broadcast:hover { background: #1976d2; }
+        .btn-direct { background: #ff9800; }
+        .btn-direct:hover { background: #f57c00; }
+        
+        /* Status */
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 P2P Chat Application - Task 2.2</h1>
+        
+        <!-- Peer Configuration -->
+        <div class="peer-info">
+            <h2>📍 Peer Configuration</h2>
+            <label>My Port:</label>
+            <input type="number" id="myPort" value="5001" placeholder="5001">
+            <label>Tracker URL:</label>
+            <input type="text" id="trackerUrl" value="http://127.0.0.1:8000" placeholder="http://127.0.0.1:8000" style="width: 300px;">
+            <br><br>
+            <button onclick="registerPeer()">📝 Register with Tracker</button>
+            <button onclick="getPeerList()">🔄 Refresh Peer List</button>
+            <div id="registerStatus"></div>
+        </div>
+        
+        <!-- Peer List -->
+        <div class="peer-list">
+            <h2>👥 Active Peers</h2>
+            <div id="peerList">No peers found. Click "Refresh Peer List"</div>
+        </div>
+        
+        <!-- Messages -->
+        <h2>💬 Messages</h2>
+        <div class="messages" id="messages">
+            <div class="message">
+                <div class="message-header"><strong>System</strong> - <em>Welcome to P2P Chat</em></div>
+                <div class="message-content">Configure your port, register with tracker, and start chatting!</div>
+            </div>
+        </div>
+        
+        <!-- Send Message -->
+        <div class="input-section">
+            <input type="text" id="messageInput" placeholder="Type your message..." onkeypress="if(event.keyCode==13) broadcastMessage()">
+            <button class="btn-broadcast" onclick="broadcastMessage()">📢 Broadcast</button>
+            <button class="btn-direct" onclick="sendDirect()">📧 Direct Send</button>
+        </div>
+        
+        <div id="sendStatus"></div>
+        
+        <!-- Instructions -->
+        <div style="margin-top: 20px; padding: 15px; background: #f0f0f0; border-radius: 5px; font-size: 13px;">
+            <strong>📚 Instructions:</strong><br>
+            1. Start tracker: <code>python start_sampleapp.py --server-port 8000</code><br>
+            2. Start peers: <code>python apps/peer.py --tracker http://127.0.0.1:8000 --port 5001</code><br>
+            3. Open this page in multiple browser tabs (different ports: 5001, 5002, 5003)<br>
+            4. Register, refresh peer list, and send messages!<br>
+            <em>Note: This is a simplified UI for demo. Real P2P requires running peer.py servers.</em>
+        </div>
+    </div>
+    
+    <script>
+        // Helper function to show status
+        function showStatus(elementId, message, type) {
+            const el = document.getElementById(elementId);
+            el.innerHTML = `<div class="status ${type}">${message}</div>`;
+            setTimeout(() => el.innerHTML = '', 5000);
+        }
+        
+        // Register peer with tracker
+        function registerPeer() {
+            const port = document.getElementById('myPort').value;
+            const trackerUrl = document.getElementById('trackerUrl').value;
+            
+            fetch(trackerUrl + '/submit-info/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ip: '127.0.0.1', port: parseInt(port) })
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                showStatus('registerStatus', `✅ Registered successfully! Peer ID: ${data.peer_id}`, 'success');
+                getPeerList(); // Auto-refresh peer list
+            })
+            .catch(err => {
+                showStatus('registerStatus', `❌ Registration failed: ${err}`, 'error');
+            });
+        }
+        
+        // Get peer list from tracker
+        function getPeerList() {
+            const trackerUrl = document.getElementById('trackerUrl').value;
+            
+            fetch(trackerUrl + '/get-list/')
+            .then(resp => resp.json())
+            .then(data => {
+                const peerListDiv = document.getElementById('peerList');
+                if (data.peers.length === 0) {
+                    peerListDiv.innerHTML = 'No peers registered yet.';
+                } else {
+                    peerListDiv.innerHTML = data.peers.map(p => 
+                        `<div class="peer-item">🟢 ${p.ip}:${p.port} (last seen: ${new Date(p.last_seen * 1000).toLocaleTimeString()})</div>`
+                    ).join('');
+                }
+                showStatus('registerStatus', `✅ Peer list refreshed! Found ${data.peers.length} peer(s)`, 'info');
+            })
+            .catch(err => {
+                showStatus('registerStatus', `❌ Failed to get peer list: ${err}`, 'error');
+            });
+        }
+        
+        // Broadcast message to all peers
+        function broadcastMessage() {
+            const message = document.getElementById('messageInput').value;
+            if (!message) {
+                showStatus('sendStatus', '⚠️ Please enter a message', 'error');
+                return;
+            }
+            
+            const myPort = document.getElementById('myPort').value;
+            
+            // In real implementation, this would call peer.py's /broadcast-peer/ API
+            // For demo, we simulate locally
+            addMessage('You (broadcast)', message, 'broadcast');
+            document.getElementById('messageInput').value = '';
+            showStatus('sendStatus', '✅ Message broadcasted!', 'success');
+            
+            // Real implementation would be:
+            // fetch(`http://127.0.0.1:${myPort}/broadcast-peer/`, {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify({ from: `127.0.0.1:${myPort}`, msg: message })
+            // })
+        }
+        
+        // Send direct message to specific peer
+        function sendDirect() {
+            const message = document.getElementById('messageInput').value;
+            if (!message) {
+                showStatus('sendStatus', '⚠️ Please enter a message', 'error');
+                return;
+            }
+            
+            const targetPort = prompt('Enter target peer port (e.g., 5002):');
+            if (!targetPort) return;
+            
+            const myPort = document.getElementById('myPort').value;
+            
+            // In real implementation, this would call peer.py's /send-peer/ API
+            addMessage(`You → ${targetPort} (direct)`, message, 'direct');
+            document.getElementById('messageInput').value = '';
+            showStatus('sendStatus', `✅ Direct message sent to port ${targetPort}!`, 'success');
+            
+            // Real implementation would be:
+            // fetch(`http://127.0.0.1:${targetPort}/send-peer/`, {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify({ from: `127.0.0.1:${myPort}`, to: `127.0.0.1:${targetPort}`, msg: message })
+            // })
+        }
+        
+        // Add message to chat display
+        function addMessage(sender, content, type) {
+            const messagesDiv = document.getElementById('messages');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${type || ''}`;
+            msgDiv.innerHTML = `
+                <div class="message-header"><strong>${sender}</strong> - <em>${new Date().toLocaleTimeString()}</em></div>
+                <div class="message-content">${content}</div>
+            `;
+            messagesDiv.appendChild(msgDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        // Auto-refresh peer list every 10 seconds
+        setInterval(() => {
+            if (document.getElementById('trackerUrl').value) {
+                getPeerList();
+            }
+        }, 10000);
+    </script>
+</body>
+</html>

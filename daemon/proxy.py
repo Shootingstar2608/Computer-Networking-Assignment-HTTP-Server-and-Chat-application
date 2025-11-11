@@ -196,10 +196,17 @@ def run_proxy(ip, port, routes):
         while True:
             conn, addr = proxy.accept()
             #
-            #  TODO: implement the step of the client incomping connection
-            #        using multi-thread programming with the
-            #        provided handle_client routine
+            # Implement threading for client connections (Task 1)
+            # Spawn a new thread for each client using handle_client routine
             #
+            client_thread = threading.Thread(
+                target=handle_client,
+                args=(ip, port, conn, addr, routes)
+            )
+            client_thread.setDaemon(True)  # Python 2 compatible
+            client_thread.start()
+            print("[Proxy] Spawned thread for client {}:{}".format(addr[0], addr[1]))
+            
     except socket.error as e:
       print("Socket error: {}".format(e))
 

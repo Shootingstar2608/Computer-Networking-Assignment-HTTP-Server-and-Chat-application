@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 #
 # Copyright (C) 2025 pdnguyen of HCMC University of Technology VNU-HCM.
@@ -256,6 +257,9 @@ class Response():
         for key, val in headers.items():
             fmt_header += "{}: {}\r\n".format(key, val)
         
+        # Add blank line to separate headers from body
+        fmt_header += "\r\n"
+        
         #
         # TODO prepare the request authentication
         #
@@ -280,6 +284,34 @@ class Response():
                 "\r\n"
                 "404 Not Found"
             ).encode('utf-8')
+
+    def build_response_error(self, status_code, message):
+        """
+        Constructs a custom HTTP error response.
+
+        :params status_code (int): HTTP status code (e.g., 401, 403, 500).
+        :params message (str): Error message to include in response body.
+        :rtype bytes: Encoded HTTP error response.
+        """
+        status_texts = {
+            400: "Bad Request",
+            401: "Unauthorized",
+            403: "Forbidden",
+            500: "Internal Server Error"
+        }
+        status_text = status_texts.get(status_code, "Error")
+        
+        body = "{} - {}".format(status_code, message)
+        content_length = len(body)
+        
+        return (
+            "HTTP/1.1 {} {}\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: {}\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "{}"
+        ).format(status_code, status_text, content_length, body).encode('utf-8')
 
 
     def build_response(self, request):

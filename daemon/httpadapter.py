@@ -21,6 +21,7 @@ raw URL paths and RESTful route definitions, and integrates with
 Request and Response objects to handle client-server communication.
 """
 
+import socket
 from .request import Request
 from .response import Response
 from .dictionary import CaseInsensitiveDict
@@ -123,6 +124,22 @@ class HttpAdapter:
             # Prepare request với headers
             req.prepare(headers_part, routes)
             
+            # Đọc thêm body dựa vào Content-Length nếu cần
+            content_length = 0
+            if req.headers.get('content-length'):
+                try:
+                    content_length = int(req.headers.get('content-length'))
+                except:
+                    pass
+            
+            # Nếu body chưa đủ, đọc tiếp
+            while len(body_part) < content_length:
+                remaining = content_length - len(body_part)
+                chunk = conn.recv(min(1024, remaining))
+                if not chunk:
+                    break
+                body_part += chunk
+            
             # Gán body vào request
             req.body = body_part
         else:
@@ -131,13 +148,26 @@ class HttpAdapter:
         
         msg = raw_data  # Để compatibility
 
-        # Handle request hook
+        # ========== TASK 2: WeApRous Hook Processing ==========
+        # Handle request hook FIRST before Task 1 logic
         if req.hook:
             print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path,req.hook._route_methods))
-            req.hook(headers = "bksysnet",body = "get in touch")
-            #
+            # Pass real body data to hook, not hardcoded "get in touch"
+            hook_result = req.hook(headers = "bksysnet", body = body_part if body_part else "")
+            
             # TODO: handle for App hook here
-            #
+            # TASK 2: If hook returns HTTP response string, use it directly
+            if hook_result:
+                print("[HttpAdapter] Hook returned response, sending to client")
+                response = hook_result
+                try:
+                    conn.sendall(response)
+                    conn.shutdown(socket.SHUT_WR)
+                except socket.error:
+                    pass
+                finally:
+                    conn.close()
+                return
 
         # ========== TASK 1: HTTP Server with Cookie Session ==========
         # response = resp.build_response(req)
@@ -149,6 +179,10 @@ class HttpAdapter:
             username = None
             password = None
             
+            # DEBUG: Print raw body
+            if hasattr(req, 'body') and req.body:
+                print "[HttpAdapter] DEBUG: Raw body = '{}'".format(repr(req.body))
+            
             # Parse body (form-urlencoded: username=admin&password=password)
             if hasattr(req, 'body') and req.body:
                 try:
@@ -159,8 +193,12 @@ class HttpAdapter:
                             params[key] = val
                     username = params.get('username', '')
                     password = params.get('password', '')
-                except:
+                    print "[HttpAdapter] DEBUG: Parsed username='{}', password='{}'".format(username, password)
+                except Exception as e:
+                    print "[HttpAdapter] ERROR parsing body: {}".format(e)
                     pass
+            else:
+                print "[HttpAdapter] DEBUG: No body found in request"
             
             # Validate credentials
             if username == 'admin' and password == 'password':
@@ -207,46 +245,50 @@ class HttpAdapter:
         elif req.method == 'GET':
             print "[HttpAdapter] Task 1B: Processing GET {}".format(req.path)
             
-            # Extract cookie từ request headers
-            cookie_header = req.headers.get('cookie', '')
-            auth_cookie = None
-            
-            if cookie_header:
-                # Parse cookie: "auth=true; other=value"
-                for pair in cookie_header.split(';'):
-                    pair = pair.strip()
-                    if '=' in pair:
-                        key, val = pair.split('=', 1)
-                        if key == 'auth':
-                            auth_cookie = val
-            
-            print "[HttpAdapter] Cookie auth={}".format(auth_cookie)
-            
-            # Kiểm tra cookie
-            if auth_cookie == 'true':
-                # Cookie hợp lệ - serve nội dung bình thường
-                print "[HttpAdapter] Cookie valid - serving content"
+            # EXCEPTION: Allow public access to login page
+            if req.path == '/login.html':
+                print "[HttpAdapter] Public access to /login.html"
                 response = resp.build_response(req)
             else:
-                # Cookie không hợp lệ - trả 401
-                print "[HttpAdapter] Cookie invalid or missing - return 401"
-                resp.status_code = 401
-                resp.reason = 'Unauthorized'
-                response = (
-                    "HTTP/1.1 401 Unauthorized\r\n"
-                    "Content-Type: text/plain\r\n"
-                    "Content-Length: 28\r\n"
-                    "Connection: close\r\n"
-                    "\r\n"
-                    "401 Unauthorized - No Cookie"
-                ).encode('utf-8')
+                # Extract cookie từ request headers
+                cookie_header = req.headers.get('cookie', '')
+                auth_cookie = None
+                
+                if cookie_header:
+                    # Parse cookie: "auth=true; other=value"
+                    for pair in cookie_header.split(';'):
+                        pair = pair.strip()
+                        if '=' in pair:
+                            key, value = pair.split('=', 1)
+                            if key == 'auth':
+                                auth_cookie = value
+                                break
+                
+                print "[HttpAdapter] Cookie: {}".format(cookie_header)
+                print "[HttpAdapter] Auth cookie: {}".format(auth_cookie)
+                
+                # Check if auth=true
+                if auth_cookie == 'true':
+                    print "[HttpAdapter] Valid auth cookie - access granted"
+                    response = resp.build_response(req)
+                else:
+                    print "[HttpAdapter] Invalid/missing auth cookie - access denied"
+                    response = resp.build_response_error(401, "Unauthorized: Valid session cookie required")
+        
+        # Bất kỳ request nào khác
         else:
-            # Các method khác (PUT, DELETE, etc.) - xử lý bình thường
+            print "[HttpAdapter] Unsupported method: {}".format(req.method)
             response = resp.build_response(req)
 
         #print(response)
-        conn.sendall(response)
-        conn.close()
+        try:
+            conn.sendall(response)
+            # Shutdown write side to signal we're done sending
+            conn.shutdown(socket.SHUT_WR)
+        except socket.error:
+            pass
+        finally:
+            conn.close()
 
     @property
     def extract_cookies(self, req, resp):
